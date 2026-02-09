@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.env
+cron.log
+daily-report-app/
+capture_token.py
