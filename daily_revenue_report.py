@@ -313,6 +313,38 @@ def get_sample_line_items(orders, n=5):
     return samples
 
 
+def top_products_by_revenue(orders, n=3):
+    """Return top N products by gross sales from yesterday's orders."""
+    products = {}
+    for order in orders:
+        for item in order.get("line_items", []):
+            title = item.get("title", "Unknown")
+            price = Decimal(str(item.get("price", "0")))
+            qty = item.get("quantity", 0)
+            line_total = price * qty
+            if title in products:
+                products[title] += line_total
+            else:
+                products[title] = line_total
+    sorted_products = sorted(products.items(), key=lambda x: x[1], reverse=True)
+    return sorted_products[:n]
+
+
+def top_products_by_units(orders, n=3):
+    """Return top N products by units sold from yesterday's orders."""
+    products = {}
+    for order in orders:
+        for item in order.get("line_items", []):
+            title = item.get("title", "Unknown")
+            qty = item.get("quantity", 0)
+            if title in products:
+                products[title] += qty
+            else:
+                products[title] = qty
+    sorted_products = sorted(products.items(), key=lambda x: x[1], reverse=True)
+    return sorted_products[:n]
+
+
 # ---------------------------------------------------------------------------
 # Report formatting
 # ---------------------------------------------------------------------------
@@ -333,7 +365,7 @@ def format_yoy(current, prior):
 
 
 def build_report(yesterday_revenue, qtd_revenue, prior_qtd_revenue,
-                 category_counts, date_label):
+                 category_counts, date_label, top_by_revenue, top_by_units):
     """Build the formatted report string."""
     yoy = format_yoy(qtd_revenue, prior_qtd_revenue)
     vinyl_units = category_counts.get("Vinyl", 0)
@@ -352,6 +384,20 @@ def build_report(yesterday_revenue, qtd_revenue, prior_qtd_revenue,
         lines.append("Categories with 10+ units sold:")
         for cat, count in cats_over_10:
             lines.append(f"• {cat}: {count} units")
+
+    # Top 3 products by gross sales
+    if top_by_revenue:
+        lines.append("")
+        lines.append("Top 3 products by gross sales:")
+        for i, (title, revenue) in enumerate(top_by_revenue, 1):
+            lines.append(f"{i}. {title} — {format_currency(revenue)}")
+
+    # Top 3 products by units
+    if top_by_units:
+        lines.append("")
+        lines.append("Top 3 products by units:")
+        for i, (title, units) in enumerate(top_by_units, 1):
+            lines.append(f"{i}. {title} — {units} units")
 
     return "\n".join(lines)
 
@@ -443,10 +489,15 @@ def main():
     )
     prior_qtd_revenue = sum_revenue(prior_orders)
 
+    # Top products
+    top_by_revenue = top_products_by_revenue(yesterday_orders)
+    top_by_units = top_products_by_units(yesterday_orders)
+
     # Build report
     report = build_report(
         yesterday_revenue, qtd_revenue, prior_qtd_revenue,
-        category_counts, ranges["yesterday_label"]
+        category_counts, ranges["yesterday_label"],
+        top_by_revenue, top_by_units
     )
 
     print("\n" + "=" * 60)
