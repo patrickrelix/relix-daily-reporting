@@ -2,9 +2,8 @@ name: Daily Revenue Report
 
 on:
   schedule:
-    # 8:00 AM Eastern = 13:00 UTC (EST) or 12:00 UTC (EDT)
-    # Using 13:00 UTC to cover EST; during EDT it will run at 9am ET
-    - cron: '0 13 * * *'
+    # 12:30 AM Eastern = 5:30 UTC (EST) or 4:30 UTC (EDT)
+    - cron: '30 5 * * *'
   workflow_dispatch: # allows manual trigger from GitHub UI
 
 jobs:
