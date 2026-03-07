@@ -42,6 +42,8 @@ CATEGORY_KEYWORDS = {
     "shirt": "Tees",
 }
 
+QTD_OFFSET = Decimal("17140.00")  # static offset for non-Shopify revenue
+
 RATE_LIMIT_DELAY = 0.5  # seconds between API calls
 MAX_RETRIES = 5
 
@@ -354,6 +356,12 @@ def format_currency(amount):
     return f"${rounded:,.2f}"
 
 
+def format_currency_nodecimal(amount):
+    """Format a Decimal as $X,XXX (no cents)."""
+    rounded = amount.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    return f"${rounded:,}"
+
+
 def format_yoy(current, prior):
     """Format year-over-year change as +X.X% or -X.X%."""
     if prior == 0:
@@ -367,24 +375,22 @@ def format_yoy(current, prior):
 def build_report(yesterday_revenue, qtd_revenue, prior_qtd_revenue,
                  category_counts, date_label, top_by_revenue, top_by_units):
     """Build the formatted report string."""
-    yoy = format_yoy(qtd_revenue, prior_qtd_revenue)
-    vinyl_units = category_counts.get("Vinyl", 0)
+    adjusted_qtd = qtd_revenue + QTD_OFFSET
+    yoy = format_yoy(adjusted_qtd, prior_qtd_revenue)
 
     lines = [
         f"Yesterday: {format_currency(yesterday_revenue)}",
-        f"QTD: {format_currency(qtd_revenue)} (vs {format_currency(prior_qtd_revenue)} last year → {yoy})",
+        f"QTD: {format_currency_nodecimal(adjusted_qtd)} (vs {format_currency(prior_qtd_revenue)} last year → {yoy})",
         "",
-        f"🎵 Vinyl units yesterday: {vinyl_units}",
     ]
 
     # Categories with 10+ units
     cats_over_10 = [(cat, count) for cat, count in category_counts.items() if count >= 10]
     if cats_over_10:
-        lines.append("")
         lines.append("Categories with 10+ units sold:")
         for cat, count in cats_over_10:
             lines.append(f"• {cat}: {count} units")
-
+    
     # Top 3 products by gross sales
     if top_by_revenue:
         lines.append("")
