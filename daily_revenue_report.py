@@ -29,18 +29,7 @@ SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
 API_VERSION = "2024-01"
 BASE_URL = f"https://{SHOPIFY_STORE}/admin/api/{API_VERSION}"
 
-CATEGORIES = ["Vinyl", "Books", "Posters", "Tees"]
-CATEGORY_KEYWORDS = {
-    "vinyl": "Vinyl",
-    "record": "Vinyl",
-    "lp": "Vinyl",
-    "book": "Books",
-    "poster": "Posters",
-    "print": "Posters",
-    "tee": "Tees",
-    "t-shirt": "Tees",
-    "shirt": "Tees",
-}
+EXCLUDED_PRODUCT_TYPES = {"Stickers", "stickers"}
 
 QTD_OFFSET = Decimal("17140.00")  # static offset for non-Shopify revenue
 
@@ -265,37 +254,23 @@ def sum_revenue(orders):
 # Category classification
 # ---------------------------------------------------------------------------
 def classify_line_item(item):
-    """Classify a line item into a category. Returns category name or None."""
+    """Classify a line item by product_type. Returns product_type string or None."""
     product_type = (item.get("product_type") or "").strip()
-
-    # Direct match on product_type
-    for cat in CATEGORIES:
-        if product_type.lower() == cat.lower():
-            return cat
-
-    # Keyword match on product_type
-    pt_lower = product_type.lower()
-    for keyword, cat in CATEGORY_KEYWORDS.items():
-        if keyword in pt_lower:
-            return cat
-
-    # Fallback: keyword match on product title
-    title = (item.get("title") or "").lower()
-    for keyword, cat in CATEGORY_KEYWORDS.items():
-        if keyword in title:
-            return cat
-
-    return None
+    if not product_type:
+        return None
+    if product_type in EXCLUDED_PRODUCT_TYPES:
+        return None
+    return product_type
 
 
 def count_units_by_category(orders):
-    """Count units sold per category from order line items."""
-    counts = {cat: 0 for cat in CATEGORIES}
+    """Count units sold per product_type from order line items."""
+    counts = {}
     for order in orders:
         for item in order.get("line_items", []):
             cat = classify_line_item(item)
             if cat:
-                counts[cat] += item.get("quantity", 0)
+                counts[cat] = counts.get(cat, 0) + item.get("quantity", 0)
     return counts
 
 
@@ -384,8 +359,11 @@ def build_report(yesterday_revenue, qtd_revenue, prior_qtd_revenue,
         "",
     ]
 
-    # Categories with 10+ units
-    cats_over_10 = [(cat, count) for cat, count in category_counts.items() if count >= 10]
+    # Categories with 10+ units — sorted descending by count
+    cats_over_10 = sorted(
+        [(cat, count) for cat, count in category_counts.items() if count >= 10],
+        key=lambda x: x[1], reverse=True
+    )
     if cats_over_10:
         lines.append("Categories with 10+ units sold:")
         for cat, count in cats_over_10:
@@ -522,9 +500,9 @@ def main():
             print("\n✅ Report copied to clipboard.")
 
         # Show sample line items for debugging
-        samples = get_sample_line_items(yesterday_orders, n=5)
+        samples = get_sample_line_items(yesterday_orders, n=10)
         if samples:
-            print("\n--- Sample line items (for category verification) ---")
+            print("\n--- Sample line items (product_type verification) ---")
             for i, s in enumerate(samples, 1):
                 print(f"  {i}. \"{s['title']}\"")
                 print(f"     product_type: \"{s['product_type']}\"  →  classified as: {s['classified_as']}")
