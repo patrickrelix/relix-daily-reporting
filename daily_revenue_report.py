@@ -2,7 +2,7 @@
 “””
 Relix Shop Daily Revenue Report
 Pulls yesterday’s sales data from Shopify and generates a formatted report.
-“””
+”””
 
 import argparse
 import os
